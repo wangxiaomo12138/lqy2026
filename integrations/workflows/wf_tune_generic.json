@@ -1,0 +1,78 @@
+{
+  "workflow_id": "wf_tune_generic",
+  "name": "通用自动调优工作流",
+  "description": "可被总 Agent 或调优助手 Agent 引用。完成：解析 target → 启动 Tune Engine → 等待完成 → 输出最优版本与指标。",
+  "version": "1.0.0",
+  "type": "workflow",
+
+  "trigger_keywords": [
+    "调优", "优化到", "提升到", "自动迭代", "tune", "benchmark"
+  ],
+
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "query": { "type": "string", "description": "用户自然语言或结构化指令" },
+      "target_id": { "type": "string", "description": "可选，如 contract-parse" },
+      "min_pass_rate": { "type": "number", "description": "可选，默认读 target 配置" }
+    }
+  },
+
+  "steps": [
+    {
+      "step": 1,
+      "name": "解析调优目标",
+      "intent": "从用户 query 识别 target_id、达标条件。映射：合同解析→contract-parse，发票→invoice-parse。未指定则询问。",
+      "tool": null
+    },
+    {
+      "step": 2,
+      "name": "启动调优",
+      "intent": "调用 MCP tune.start",
+      "tool": {
+        "mcp": "tune-mcp",
+        "name": "tune.start",
+        "arguments_template": {
+          "target_id": "{{target_id}}",
+          "async": true,
+          "success_criteria_override": "{{success_criteria_override}}"
+        }
+      }
+    },
+    {
+      "step": 3,
+      "name": "查询进度",
+      "intent": "调用 MCP tune.status，include_iters=true。若 status 仍为 running/pending 则等待后重查。",
+      "tool": {
+        "mcp": "tune-mcp",
+        "name": "tune.status",
+        "arguments_template": {
+          "session_id": "{{session_id}}",
+          "include_iters": true
+        }
+      }
+    },
+    {
+      "step": 4,
+      "name": "获取结果",
+      "intent": "调用 MCP tune.get_result，wait=true",
+      "tool": {
+        "mcp": "tune-mcp",
+        "name": "tune.get_result",
+        "arguments_template": {
+          "session_id": "{{session_id}}",
+          "wait": true,
+          "wait_timeout_sec": 600
+        }
+      }
+    },
+    {
+      "step": 5,
+      "name": "总结输出",
+      "intent": "向用户报告：是否达标、最优版本号、分数、迭代轮数、是否建议晋升。未达标时给出 recommendations。",
+      "tool": null
+    }
+  ],
+
+  "platform_import_note": "将本 JSON 的 steps 描述复制到平台工作流编辑器；或整文件作为工作流元数据导入（若平台支持 JSON 导入）"
+}

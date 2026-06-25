@@ -1,0 +1,31 @@
+services:
+  tune-engine:
+    build:
+      context: .
+      dockerfile: tune-engine/Dockerfile
+    ports:
+      - "8100:8100"
+    volumes:
+      - ./tune-engine/data:/app/data
+      - ./data:/app/shared_data
+    environment:
+      - USE_MOCK_AGENT=true
+    restart unless-stopped
+
+  check-mcp:
+    build:
+      context: .
+      dockerfile: check-mcp/Dockerfile
+    ports:
+      - "8200:8200"
+    restart unless-stopped
+
+  run-log-mcp:
+    build:
+      context: .
+      dockerfile: run-log-mcp/Dockerfile
+    ports:
+      - "8300:8300"
+    volumes:
+      - ./data:/app/data
+    restart unless-stopped

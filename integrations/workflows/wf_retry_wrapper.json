@@ -1,0 +1,40 @@
+{
+  "workflow_id": "wf_retry_wrapper",
+  "name": "在线重试包装工作流",
+  "description": "包装任意业务工作流：执行后检查、记录、未通过则重试。供总 Agent 在调用「合同解析」等业务前先走检查逻辑。",
+  "version": "1.0.0",
+
+  "trigger": "业务类 query（非调优指令）且任务需要结构化输出",
+
+  "steps": [
+    {
+      "step": 1,
+      "name": "执行业务工作流",
+      "intent": "按工作流描述路由到目标业务流（如合同解析），得到 output"
+    },
+    {
+      "step": 2,
+      "name": "检查并记录",
+      "intent": "依次调用 check.evaluate 和 run.log（attempt=1）。run.log 必调。"
+    },
+    {
+      "step": 3,
+      "name": "条件重试",
+      "intent": "若 passed=false，构造【上次执行问题】+ 原始 query，重新路由业务工作流"
+    },
+    {
+      "step": 4,
+      "name": "再检查并记录",
+      "intent": "check.evaluate + run.log（attempt=2）"
+    },
+    {
+      "step": 5,
+      "name": "总结",
+      "intent": "输出 optimal/best_effort、result、attempts"
+    }
+  ],
+
+  "compose_with": {
+    "note": "本工作流不替代业务工作流，而是包在外面。平台配置：总Agent → 引用 wf_retry_wrapper → 内部路由到 wf_contract_parse"
+  }
+}

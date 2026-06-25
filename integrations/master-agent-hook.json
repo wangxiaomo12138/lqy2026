@@ -1,0 +1,37 @@
+{
+  "master_agent_extensions": {
+    "description": "在现有总 Agent 上追加以下引用即可，无需重建 Agent",
+    "mcp_servers": [
+      { "name": "tune-mcp", "url": "http://YOUR_HOST:8100/mcp" },
+      { "name": "check-mcp", "url": "http://YOUR_HOST:8200/mcp" },
+      { "name": "run-log-mcp", "url": "http://YOUR_HOST:8300/mcp" }
+    ],
+    "agent_refs": [
+      {
+        "agent_id": "tune-assistant",
+        "when": "用户意图为调优",
+        "ref_file": "integrations/agents/tune-assistant.json"
+      },
+      {
+        "agent_id": "retry-assistant",
+        "when": "业务 query 需要结构化输出且可能需重试",
+        "ref_file": "integrations/agents/retry-assistant.json"
+      }
+    ],
+    "workflow_refs": [
+      {
+        "workflow_id": "wf_tune_generic",
+        "when": "mode=auto_tune",
+        "ref_file": "integrations/workflows/wf_tune_generic.json"
+      }
+    ],
+    "skill_refs": [
+      "integrations/skills/auto-tune-operator/SKILL.md",
+      "skills/auto-retry-replan/SKILL.md"
+    ],
+    "routing_rules": [
+      "若 query 含调优/优化到/提升到 → 路由 tune-assistant 或 wf_tune_generic",
+      "否则 → 业务工作流 + auto-retry-replan Skill"
+    ]
+  }
+}

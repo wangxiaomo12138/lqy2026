@@ -1,0 +1,350 @@
+{
+  "$schema": "tune-mcp/v1",
+  "name": "tune-mcp",
+  "description": "通用 Agent 循环调优 MCP 工具集",
+  "tools": [
+    {
+      "name": "tune.start",
+      "description": "启动一次自动调优会话。引擎会按 target 配置循环：跑 benchmark → 评估 → 未达标则改配置再跑，达标后返回 optimal。",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "target_id": {
+            "type": "string",
+            "description": "可调优对象 ID，如 contract-parse"
+          },
+          "mode": {
+            "type": "string",
+            "enum": ["full_auto", "evaluate_only", "dry_run"],
+            "default": "full_auto",
+            "description": "full_auto=完整调优循环；evaluate_only=只跑测评分不调配置；dry_run=只模拟补丁不落地"
+          },
+          "entry_ref": {
+            "type": "string",
+            "description": "可选，覆盖 target 默认 entry_ref，指定从某版本开始调"
+          },
+          "benchmark_suite_id": {
+            "type": "string",
+            "description": "可选，覆盖 target 默认测试集"
+          },
+          "success_criteria_override": {
+            "type": "object",
+            "description": "可选，临时覆盖达标条件，如 {\"min_pass_rate\": 0.95}"
+          },
+          "constraints_override": {
+            "type": "object",
+            "description": "可选，临时覆盖循环约束，如 {\"max_tune_iters\": 5}"
+          },
+          "input_payload": {
+            "type": "object",
+            "description": "可选，传给目标 Agent/工作流的默认输入参数"
+          },
+          "callback_url": {
+            "type": "string",
+            "description": "可选，异步完成时回调地址"
+          },
+          "async": {
+            "type": "boolean",
+            "default": true,
+            "description": "true=立即返回 session_id，后台执行；false=同步阻塞直到结束"
+          }
+        },
+        "required": ["target_id"]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "session_id": { "type": "string", "description": "调优会话 ID" },
+          "status": {
+            "type": "string",
+            "enum": ["pending", "running", "optimal", "best_effort", "failed", "stopped"]
+          },
+          "target_id": { "type": "string" },
+          "entry_ref": { "type": "string", "description": "起始版本" },
+          "message": { "type": "string" },
+          "created_at": { "type": "string", "format": "date-time" }
+        },
+        "required": ["session_id", "status", "target_id"]
+      },
+      "examples": [
+        {
+          "request": {
+            "target_id": "contract-parse",
+            "mode": "full_auto",
+            "async": true,
+            "success_criteria_override": { "min_pass_rate": 0.9 }
+          },
+          "response": {
+            "session_id": "ts_20250624_abc123",
+            "status": "running",
+            "target_id": "contract-parse",
+            "entry_ref": "wf_contract_parse@v3",
+            "message": "Tune session started",
+            "created_at": "2025-06-24T10:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "name": "tune.status",
+      "description": "查询调优会话当前状态、进度、分数、最优版本。",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "description": "tune.start 返回的会话 ID"
+          },
+          "include_iters": {
+            "type": "boolean",
+            "default": false,
+            "description": "是否返回每轮迭代详情"
+          },
+          "include_latest_run": {
+            "type": "boolean",
+            "default": false,
+            "description": "是否附带最新一轮 benchmark 摘要"
+          }
+        },
+        "required": ["session_id"]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "session_id": { "type": "string" },
+          "status": {
+            "type": "string",
+            "enum": ["pending", "running", "optimal", "best_effort", "failed", "stopped"]
+          },
+          "target_id": { "type": "string" },
+          "current_iter": { "type": "integer", "description": "当前迭代轮次" },
+          "max_iters": { "type": "integer" },
+          "progress_pct": { "type": "number", "description": "0-100" },
+          "best": {
+            "type": "object",
+            "properties": {
+              "entry_ref": { "type": "string" },
+              "score": { "type": "number" },
+              "pass_rate": { "type": "number" },
+              "metrics": { "type": "object" }
+            }
+          },
+          "success_criteria": { "type": "object" },
+          "criteria_met": { "type": "boolean" },
+          "stop_reason": {
+            "type": "string",
+            "enum": ["", "target_met", "max_iters", "stagnation", "budget_exceeded", "manual_stop", "error"]
+          },
+          "iters": {
+            "type": "array",
+            "items": { "$ref": "#/definitions/TuneIterSummary" }
+          },
+          "updated_at": { "type": "string", "format": "date-time" }
+        },
+        "required": ["session_id", "status", "current_iter"]
+      },
+      "examples": [
+        {
+          "request": { "session_id": "ts_20250624_abc123", "include_iters": true },
+          "response": {
+            "session_id": "ts_20250624_abc123",
+            "status": "running",
+            "target_id": "contract-parse",
+            "current_iter": 2,
+            "max_iters": 8,
+            "progress_pct": 25,
+            "best": {
+              "entry_ref": "wf_contract_parse@v4",
+              "score": 0.81,
+              "pass_rate": 0.81,
+              "metrics": { "field_f1": 0.79, "p95_latency_ms": 9800 }
+            },
+            "success_criteria": { "min_pass_rate": 0.9, "min_field_f1": 0.88 },
+            "criteria_met": false,
+            "stop_reason": "",
+            "iters": [
+              {
+                "iter_no": 1,
+                "entry_ref": "wf_contract_parse@v3",
+                "score": 0.72,
+                "pass_rate": 0.72,
+                "patch_applied": true,
+                "promoted": true
+              },
+              {
+                "iter_no": 2,
+                "entry_ref": "wf_contract_parse@v4",
+                "score": 0.81,
+                "pass_rate": 0.81,
+                "patch_applied": false,
+                "promoted": false
+              }
+            ],
+            "updated_at": "2025-06-24T10:08:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "name": "tune.get_result",
+      "description": "获取调优最终结果。status=optimal 表示达标；best_effort 表示未达标但返回当前最优。",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "session_id": { "type": "string" },
+          "wait": {
+            "type": "boolean",
+            "default": false,
+            "description": "true=若仍在 running 则阻塞等待完成（带超时）"
+          },
+          "wait_timeout_sec": {
+            "type": "integer",
+            "default": 300,
+            "description": "wait=true 时的最长等待秒数"
+          },
+          "include_artifact": {
+            "type": "boolean",
+            "default": true,
+            "description": "是否返回最优一次执行的输出样例"
+          }
+        },
+        "required": ["session_id"]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "session_id": { "type": "string" },
+          "status": {
+            "type": "string",
+            "enum": ["optimal", "best_effort", "failed", "stopped", "running", "pending"]
+          },
+          "target_id": { "type": "string" },
+          "best_entry_ref": { "type": "string", "description": "最优配置版本" },
+          "score": { "type": "number" },
+          "metrics": {
+            "type": "object",
+            "description": "最终指标，如 pass_rate, field_f1, p95_latency_ms"
+          },
+          "success_criteria": { "type": "object" },
+          "criteria_met": { "type": "boolean" },
+          "total_iters": { "type": "integer" },
+          "stop_reason": { "type": "string" },
+          "artifact": {
+            "type": "object",
+            "description": "最优 run 的输出（如解析后的 JSON 示例）",
+            "properties": {
+              "run_id": { "type": "string" },
+              "sample_case_id": { "type": "string" },
+              "output": { "type": "object" }
+            }
+          },
+          "recommendations": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "未达标时的人工建议"
+          },
+          "finished_at": { "type": "string", "format": "date-time" }
+        },
+        "required": ["session_id", "status", "best_entry_ref", "score", "criteria_met"]
+      },
+      "examples": [
+        {
+          "request": { "session_id": "ts_20250624_abc123", "wait": true },
+          "response": {
+            "session_id": "ts_20250624_abc123",
+            "status": "optimal",
+            "target_id": "contract-parse",
+            "best_entry_ref": "wf_contract_parse@v5",
+            "score": 0.91,
+            "metrics": {
+              "pass_rate": 0.91,
+              "field_f1": 0.89,
+              "error_rate": 0.03,
+              "p95_latency_ms": 10500
+            },
+            "success_criteria": { "min_pass_rate": 0.9, "min_field_f1": 0.88 },
+            "criteria_met": true,
+            "total_iters": 3,
+            "stop_reason": "target_met",
+            "artifact": {
+              "run_id": "run_003_case_07",
+              "sample_case_id": "contract_case_07",
+              "output": {
+                "party_a": "甲公司",
+                "party_b": "乙公司",
+                "amount": 1200000,
+                "sign_date": "2024-03-15"
+              }
+            },
+            "recommendations": [],
+            "finished_at": "2025-06-24T10:15:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "name": "tune.stop",
+      "description": "手动停止正在运行的调优会话，返回当前最优结果。",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "session_id": { "type": "string" },
+          "reason": { "type": "string", "default": "manual_stop" }
+        },
+        "required": ["session_id"]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "session_id": { "type": "string" },
+          "status": { "type": "string", "enum": ["stopped"] },
+          "best_entry_ref": { "type": "string" },
+          "score": { "type": "number" }
+        }
+      }
+    },
+    {
+      "name": "tune.register_target",
+      "description": "注册或更新一个 Tunable Target（管理面工具，可选）。",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "target": {
+            "type": "object",
+            "description": "完整的 Tunable Target 配置，见 01-tunable-target-template.yaml"
+          },
+          "overwrite": {
+            "type": "boolean",
+            "default": false,
+            "description": "target_id 已存在时是否覆盖"
+          }
+        },
+        "required": ["target"]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "target_id": { "type": "string" },
+          "version": { "type": "integer" },
+          "enabled": { "type": "boolean" }
+        }
+      }
+    }
+  ],
+  "definitions": {
+    "TuneIterSummary": {
+      "type": "object",
+      "properties": {
+        "iter_no": { "type": "integer" },
+        "entry_ref": { "type": "string" },
+        "score": { "type": "number" },
+        "pass_rate": { "type": "number" },
+        "metrics": { "type": "object" },
+        "patch_applied": { "type": "boolean" },
+        "patch_type": { "type": "string" },
+        "promoted": { "type": "boolean" },
+        "duration_ms": { "type": "integer" }
+      }
+    }
+  }
+}

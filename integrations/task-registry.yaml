@@ -1,0 +1,46 @@
+# 业务 task 注册表 — 单次循环 & run.log 通用配置
+# 新业务：复制一段，改字段，挂到 Skill 或工作流描述里即可
+
+tasks:
+  contract-parse:
+    target_id: contract-parse
+    task_type: contract-parse
+    name: 合同解析
+    workflow_ref: wf_contract_parse
+    expected_fields:
+      - party_a
+      - party_b
+      - amount
+      - sign_date
+    trigger_keywords:
+      - 合同
+      - 解析合同
+      - 抽取条款
+    output_schema: "JSON: party_a, party_b, amount, sign_date"
+
+  invoice-parse:
+    target_id: invoice-parse
+    task_type: invoice-parse
+    name: 发票识别
+    workflow_ref: wf_invoice_parse
+    expected_fields:
+      - seller
+      - buyer
+      - amount
+      - tax_id
+      - invoice_date
+    trigger_keywords:
+      - 发票
+      - 开票
+      - 税号
+    output_schema: "JSON: seller, buyer, amount, tax_id, invoice_date"
+
+# 模板（复制使用）
+template:
+  target_id: ""
+  task_type: ""
+  name: ""
+  workflow_ref: ""
+  expected_fields: []
+  trigger_keywords: []
+  output_schema: ""

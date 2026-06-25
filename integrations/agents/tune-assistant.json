@@ -1,0 +1,52 @@
+{
+  "agent_id": "tune-assistant",
+  "name": "调优助手 Agent",
+  "description": "开箱即用的自动调优 Agent。用户说「帮我把xxx调到90%」即可触发 Tune Engine 批量调优；也可查询调优进度与结果。",
+  "version": "1.0.0",
+  "type": "agent",
+
+  "mcp_servers": [
+    {
+      "name": "tune-mcp",
+      "url": "http://YOUR_HOST:8100/mcp",
+      "tools": ["tune.start", "tune.status", "tune.get_result", "tune.stop"]
+    },
+    {
+      "name": "run-log-mcp",
+      "url": "http://YOUR_HOST:8300/mcp",
+      "tools": ["run.log", "run.stats"]
+    }
+  ],
+
+  "skills": [
+    {
+      "skill_id": "auto-tune-operator",
+      "ref": "integrations/skills/auto-tune-operator/SKILL.md"
+    }
+  ],
+
+  "workflows": [
+    {
+      "workflow_id": "wf_tune_generic",
+      "ref": "integrations/workflows/wf_tune_generic.json",
+      "bind": "primary"
+    }
+  ],
+
+  "planner": {
+    "max_steps": 5,
+    "description": "调优专用规划器：识别 target_id → 启动调优 → 查进度 → 返回结果"
+  },
+
+  "summary_prompt": "你是调优助手。输出须包含：target_id、status(optimal/best_effort)、best_entry_ref、通过率/分数、总迭代轮数、是否建议晋升生产版本。",
+
+  "usage": {
+    "trigger_examples": [
+      "帮我把合同解析调到90%准确率",
+      "对 contract-parse 执行自动调优",
+      "查看上次调优结果",
+      "调优进度怎么样了"
+    ],
+    "how_others_use": "在总 Agent 中通过 agent 引用添加本 Agent，或把本 Agent 的工作流挂到总 Agent 下"
+  }
+}

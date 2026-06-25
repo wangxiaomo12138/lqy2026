@@ -1,0 +1,52 @@
+{
+  "target_id": "contract-parse",
+  "name": "合同解析",
+  "description": "从合同文本/文件中抽取结构化字段并输出 JSON",
+  "type": "workflow",
+  "entry_ref": "wf_contract_parse@v3",
+  "benchmark_suite_id": "contract_bench_v1",
+  "evaluator_id": "contract_field_eval",
+  "patchable_components": ["workflow", "skill", "agent", "mcp"],
+  "success_criteria": {
+    "min_pass_rate": 0.90,
+    "min_field_f1": 0.88,
+    "max_error_rate": 0.05,
+    "max_p95_latency_ms": 12000
+  },
+  "constraints": {
+    "max_tune_iters": 8,
+    "max_cost_tokens": 300000,
+    "max_wall_time_sec": 7200,
+    "single_knob_per_iter": true,
+    "stagnation_window": 3,
+    "min_delta": 0.02
+  },
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "file_url": { "type": "string" },
+      "extract_fields": {
+        "type": "array",
+        "items": { "type": "string" }
+      }
+    },
+    "required": ["file_url"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "party_a": { "type": "string" },
+      "party_b": { "type": "string" },
+      "amount": { "type": "number" },
+      "sign_date": { "type": "string" },
+      "payment_terms": { "type": "string" },
+      "penalty_clause": { "type": "string" }
+    }
+  },
+  "metadata": {
+    "owner": "legal-ai-team",
+    "tags": ["contract", "extraction"]
+  },
+  "enabled": true,
+  "version": 1
+}
