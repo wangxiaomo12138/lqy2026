@@ -26,7 +26,7 @@ bash scripts/start-all.sh
 | 服务 | 端口 | 给别人挂 MCP |
 |------|------|-------------|
 | Tune Engine | 8100 | `http://HOST:8100/mcp` |
-| check-mcp | 8200 | `http://HOST:8200/mcp` |
+| check-mcp | 8200 | `http://HOST:8200/sse`（SSE） |
 | run-log-mcp | 8300 | `http://HOST:8300/mcp` |
 
 ## 文档

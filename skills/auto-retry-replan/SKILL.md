@@ -22,7 +22,7 @@
 
 | MCP | 端口 | 工具 | 用途 |
 |-----|------|------|------|
-| check-mcp | 8200 | `check.evaluate` | 当场检查是否达标 |
+| check-mcp | 8200 | `check.evaluate` | 当场检查是否达标（SSE：`/sse`） |
 | run-log-mcp | 8300 | `run.log` | **跑完必调**，记录结果与总结 |
 
 ---

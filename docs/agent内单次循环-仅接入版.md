@@ -48,9 +48,9 @@ pip install -r requirements.txt
 python server.py
 ```
 
-服务地址：`http://你的服务器:8200`
+服务地址：`http://你的服务器:8200/sse`（平台选 **HTTP SSE** 传输）
 
-在平台里给总 Agent **添加 MCP**：`check-mcp`  
+在平台里给总 Agent **添加 MCP**：`check-mcp`，URL 填 `http://你的服务器:8200/sse`  
 工具名：`check.evaluate`
 
 ### 第 2 步：给总 Agent 挂上 Skill

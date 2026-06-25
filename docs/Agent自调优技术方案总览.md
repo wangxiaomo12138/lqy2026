@@ -330,7 +330,7 @@ python server.py
 
 ```bash
 curl http://127.0.0.1:8200/health
-# 应返回 {"status":"ok"}
+# 应返回 {"status":"ok","transport":"sse","sse_url":"/sse"}
 ```
 
 **用到文件：** `check-mcp/server.py`、`check-mcp/requirements.txt`
@@ -341,7 +341,7 @@ curl http://127.0.0.1:8200/health
 
 在总 Agent（或合同解析 Agent）配置中：
 
-- 添加 MCP **check-mcp**：`http://你的服务器:8200` → 工具 `check.evaluate`
+- 添加 MCP **check-mcp**：`http://你的服务器:8200/sse`（传输选 **HTTP SSE**）→ 工具 `check.evaluate`
 - 添加 MCP **run-log-mcp**：`http://你的服务器:8300` → 工具 `run.log`、`run.stats`
 
 **用到文件：** 无（平台 UI 操作）

@@ -33,7 +33,7 @@ sleep 2
 echo ""
 echo "服务地址："
 echo "  Tune Engine  http://127.0.0.1:8100/docs"
-echo "  check-mcp    http://127.0.0.1:8200/health"
+echo "  check-mcp    http://127.0.0.1:8200/sse  (SSE)"
 echo "  run-log-mcp  http://127.0.0.1:8300/health"
 echo ""
 echo "他人接入见：docs/他人接入指南.md"
