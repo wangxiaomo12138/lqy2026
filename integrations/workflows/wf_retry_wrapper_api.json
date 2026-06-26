@@ -1,0 +1,245 @@
+{
+  "workflow_id": "wf_retry_wrapper_api",
+  "name": "在线重试包装工作流（API 版）",
+  "description": "不依赖 MCP：通过 Flask HTTP API 完成检查与记录。包装任意业务工作流，执行后 check → log → 未通过则重试。",
+  "version": "1.0.0",
+  "skill_ref": "skills/auto-retry-replan-api/SKILL.md",
+
+  "config": {
+    "note": "check-mcp / run-log-mcp 为 Flask 服务，API 节点 Content-Type: application/json；YOUR_HOST 改为实际 IP",
+    "hosts": {
+      "check_base": "http://YOUR_HOST:8200",
+      "run_log_base": "http://YOUR_HOST:8300"
+    },
+    "defaults": {
+      "task_type": "contract-parse",
+      "target_id": "contract-parse",
+      "expected_fields": ["party_a", "party_b", "amount", "sign_date"],
+      "output_schema": "JSON: party_a, party_b, amount, sign_date",
+      "max_attempts": 3
+    },
+    "placeholders": {
+      "query": "用户原始 query，来自工作流输入",
+      "output": "上一步业务工作流的结构化输出",
+      "summary": "总结模型输出，检查阶段可为空字符串",
+      "check_result": "check API 完整响应 JSON",
+      "failure_points": "check_result.failure_points",
+      "agent_id": "当前 Agent ID，可选",
+      "entry_ref": "当前业务工作流版本，可选",
+      "business_workflow_ref": "被包装的业务工作流 ID，如 wf_contract_parse"
+    }
+  },
+
+  "steps": [
+    {
+      "step": 1,
+      "name": "执行业务工作流",
+      "type": "workflow",
+      "intent": "路由到目标业务工作流，得到 output",
+      "workflow_ref": "{{business_workflow_ref}}",
+      "input": {
+        "query": "{{query}}"
+      },
+      "output_var": "output"
+    },
+    {
+      "step": 2,
+      "name": "检查 output",
+      "type": "http_api",
+      "intent": "调用 check-mcp REST API 评估上一步输出",
+      "request": {
+        "method": "POST",
+        "url": "{{hosts.check_base}}/api/v1/check/evaluate",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "task_type": "{{defaults.task_type}}",
+          "output": "{{output}}",
+          "expected_fields": "{{defaults.expected_fields}}",
+          "summary": "{{summary}}"
+        }
+      },
+      "output_var": "check_result",
+      "success_field": "passed"
+    },
+    {
+      "step": 3,
+      "name": "记录第 1 次运行",
+      "type": "http_api",
+      "intent": "检查后必须落盘，供 Tune Engine 回流",
+      "request": {
+        "method": "POST",
+        "url": "{{hosts.run_log_base}}/api/v1/run/log",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "target_id": "{{defaults.target_id}}",
+          "task_type": "{{defaults.task_type}}",
+          "query": "{{query}}",
+          "output": "{{output}}",
+          "summary": "{{summary}}",
+          "expected_fields": "{{defaults.expected_fields}}",
+          "attempt": 1,
+          "agent_id": "{{agent_id}}",
+          "entry_ref": "{{entry_ref}}",
+          "check_result": "{{check_result}}"
+        }
+      },
+      "output_var": "log_result_1"
+    },
+    {
+      "step": 4,
+      "name": "条件重试",
+      "type": "branch",
+      "intent": "check_result.passed=false 时带 failure_points 重跑业务工作流",
+      "condition": "{{check_result.passed}} == false",
+      "then": [
+        {
+          "name": "构造重试 query",
+          "type": "transform",
+          "template": "【原始任务】\n{{query}}\n\n【上次执行问题】\n{{check_result.failure_points}}\n\n【重试要求】\n1. 针对上述问题修正\n2. 必须补全缺失字段\n3. 输出格式: {{defaults.output_schema}}",
+          "output_var": "retry_query"
+        },
+        {
+          "name": "重执行业务工作流",
+          "type": "workflow",
+          "workflow_ref": "{{business_workflow_ref}}",
+          "input": {
+            "query": "{{retry_query}}"
+          },
+          "output_var": "output"
+        },
+        {
+          "name": "第 2 次检查",
+          "type": "http_api",
+          "request": {
+            "method": "POST",
+            "url": "{{hosts.check_base}}/api/v1/check/evaluate",
+            "headers": {
+              "Content-Type": "application/json"
+            },
+            "body": {
+              "task_type": "{{defaults.task_type}}",
+              "output": "{{output}}",
+              "expected_fields": "{{defaults.expected_fields}}",
+              "summary": "{{summary}}"
+            }
+          },
+          "output_var": "check_result"
+        },
+        {
+          "name": "记录第 2 次运行",
+          "type": "http_api",
+          "request": {
+            "method": "POST",
+            "url": "{{hosts.run_log_base}}/api/v1/run/log",
+            "headers": {
+              "Content-Type": "application/json"
+            },
+            "body": {
+              "target_id": "{{defaults.target_id}}",
+              "task_type": "{{defaults.task_type}}",
+              "query": "{{query}}",
+              "output": "{{output}}",
+              "summary": "{{summary}}",
+              "expected_fields": "{{defaults.expected_fields}}",
+              "attempt": 2,
+              "agent_id": "{{agent_id}}",
+              "entry_ref": "{{entry_ref}}",
+              "check_result": "{{check_result}}"
+            }
+          },
+          "output_var": "log_result_2"
+        }
+      ]
+    },
+    {
+      "step": 5,
+      "name": "总结输出",
+      "type": "summarize",
+      "intent": "输出 optimal 或 best_effort",
+      "input": {
+        "check_result": "{{check_result}}",
+        "output": "{{output}}",
+        "query": "{{query}}"
+      },
+      "output_schema": {
+        "status": "optimal | best_effort",
+        "attempts": "integer",
+        "result": "object",
+        "issues": "array"
+      }
+    }
+  ],
+
+  "api_reference": {
+    "check_evaluate": {
+      "method": "POST",
+      "url": "http://YOUR_HOST:8200/api/v1/check/evaluate",
+      "body_example": {
+        "task_type": "contract-parse",
+        "output": {
+          "party_a": "甲公司",
+          "party_b": "乙公司"
+        },
+        "expected_fields": ["party_a", "party_b", "amount", "sign_date"],
+        "summary": ""
+      },
+      "response_example": {
+        "passed": false,
+        "score": 0.5,
+        "field_score": 0.5,
+        "summary_score": 0.0,
+        "failure_points": {
+          "missing_fields": ["amount", "sign_date"],
+          "failures": [{"type": "missing_field", "field": "amount"}],
+          "summary_issues": ["总结为空"]
+        },
+        "recommendation": "补全缺失字段后重试"
+      }
+    },
+    "run_log": {
+      "method": "POST",
+      "url": "http://YOUR_HOST:8300/api/v1/run/log",
+      "body_example": {
+        "target_id": "contract-parse",
+        "task_type": "contract-parse",
+        "query": "解析合同…",
+        "output": {"party_a": "甲公司", "party_b": "乙公司"},
+        "summary": "",
+        "expected_fields": ["party_a", "party_b", "amount", "sign_date"],
+        "attempt": 1,
+        "check_result": {
+          "passed": false,
+          "score": 0.5,
+          "failure_points": {"missing_fields": ["amount", "sign_date"]}
+        }
+      },
+      "response_example": {
+        "logged": true,
+        "case_id": "run_20260624_abc12345",
+        "passed": false,
+        "score": 0.5,
+        "saved_to": ["run_logs.jsonl", "failure_cases.jsonl"]
+      }
+    },
+    "run_stats": {
+      "method": "GET",
+      "url": "http://YOUR_HOST:8300/api/v1/run/stats?target_id=contract-parse&limit=100"
+    }
+  },
+
+  "compose_with": {
+    "note": "总 Agent → 引用本工作流 → 内部路由到 wf_contract_parse 等业务流。新业务只改 defaults.task_type 与 expected_fields。"
+  },
+
+  "platform_setup_checklist": [
+    "1. 将 config.hosts 中 YOUR_HOST 改为实际 IP",
+    "2. 将 business_workflow_ref 设为业务工作流 ID",
+    "3. 绑定 Skill auto-retry-replan-api",
+    "4. 按业务修改 defaults.task_type / expected_fields",
+    "5. 验证: curl check / run.log 两个 API 均 200"
+  ]
+}

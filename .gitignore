@@ -14,6 +14,7 @@ build/
 # Runtime data (regenerable)
 tune-engine/data/*.db
 *.log
+single-loop-local/config.yaml
 
 # Keep data directory structure but ignore large/generated logs if needed
 # data/run_logs.jsonl and failure_cases.jsonl are kept as examples can be empty

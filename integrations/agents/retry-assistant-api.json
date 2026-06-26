@@ -1,0 +1,44 @@
+{
+  "agent_id": "retry-assistant-api",
+  "name": "在线重试助手（API 版）",
+  "description": "MCP 不通时使用：通过 HTTP API 完成检查与记录。总 Agent 引用本 Agent，或复制 Skill + 工作流模板到业务 Agent。",
+  "version": "1.0.0",
+
+  "api_services": [
+    {
+      "name": "check-mcp",
+      "base_url": "http://YOUR_HOST:8200",
+      "endpoints": {
+        "evaluate": "POST /api/v1/check/evaluate",
+        "tasks": "GET /api/v1/tasks"
+      }
+    },
+    {
+      "name": "run-log-mcp",
+      "base_url": "http://YOUR_HOST:8300",
+      "endpoints": {
+        "log": "POST /api/v1/run/log",
+        "stats": "GET /api/v1/run/stats"
+      }
+    }
+  ],
+
+  "skills": [
+    {
+      "skill_id": "auto-retry-replan-api",
+      "ref": "skills/auto-retry-replan-api/SKILL.md"
+    }
+  ],
+
+  "workflows": [
+    {
+      "workflow_id": "wf_retry_wrapper_api",
+      "ref": "integrations/workflows/wf_retry_wrapper_api.json"
+    }
+  ],
+
+  "usage": {
+    "how_others_use": "总 Agent 引用本 Agent；或引用 wf_retry_wrapper_api 工作流 + 挂 auto-retry-replan-api Skill",
+    "when_to_use": "平台 MCP SSE 接入失败或仅支持 API/HTTP 节点时"
+  }
+}

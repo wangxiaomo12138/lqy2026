@@ -4,10 +4,11 @@
 
 ## 两套能力都可通用接入
 
-| 能力 | 引用 Agent | 引用工作流 | MCP |
-|------|------------|------------|-----|
-| **单次循环（在线重试）** | `agents/retry-assistant.json` | `workflows/wf_retry_wrapper.json` | :8200 + :8300 |
-| **批量调优（Tune Engine）** | `agents/tune-assistant.json` | `workflows/wf_tune_generic.json` | :8100 |
+| 能力 | 引用 Agent | 引用工作流 | 接入方式 |
+|------|------------|------------|----------|
+| **单次循环（在线重试）** | `agents/retry-assistant.json` | `workflows/wf_retry_wrapper.json` | MCP :8200 + :8300 |
+| **单次循环（API 版）** ★ MCP 不通时 | `agents/retry-assistant-api.json` | `workflows/wf_retry_wrapper_api.json` | HTTP API |
+| **批量调优（Tune Engine）** | `agents/tune-assistant.json` | `workflows/wf_tune_generic.json` | MCP :8100 |
 
 ## 目录
 
@@ -15,10 +16,12 @@
 integrations/
 ├── agents/
 │   ├── tune-assistant.json      # 「调优助手」Agent 模板
-│   └── retry-assistant.json     # 「在线重试」Agent 模板
+│   ├── retry-assistant.json     # 「在线重试」Agent 模板（MCP）
+│   └── retry-assistant-api.json # 「在线重试」Agent 模板（API 版）
 ├── workflows/
 │   ├── wf_tune_generic.json     # 通用调优工作流（可引用）
-│   └── wf_retry_wrapper.json    # 在线重试包装工作流
+│   ├── wf_retry_wrapper.json    # 在线重试包装工作流（MCP）
+│   └── wf_retry_wrapper_api.json # 在线重试包装工作流（API，含 URL/body）
 ├── skills/
 │   └── auto-tune-operator/      # 调优专用 Skill
 └── master-agent-hook.json       # 总 Agent 追加配置清单
@@ -34,9 +37,10 @@ integrations/
 
 ### 单次循环（3 选 1）
 
-1. 引用 **在线重试助手 Agent** → `agents/retry-assistant.json`
-2. 引用 **重试包装工作流** → `workflows/wf_retry_wrapper.json`
-3. 业务 Agent 直接挂 Skill + 两个 MCP
+1. 引用 **在线重试助手 Agent** → `agents/retry-assistant.json`（MCP）
+2. 引用 **在线重试助手 API 版** → `agents/retry-assistant-api.json`（**MCP 不通时**）
+3. 引用 **重试包装工作流** → `wf_retry_wrapper.json` 或 `wf_retry_wrapper_api.json`
+4. 业务 Agent 直接挂 Skill + 两个服务（MCP 或 API）
 
 ### 批量调优（3 选 1）
 

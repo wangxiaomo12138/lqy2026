@@ -1,0 +1,38 @@
+# 复制为 config.yaml 后修改
+
+model:
+  # openai = OpenAI 兼容 Chat Completions（/v1/chat/completions）
+  # http_json = 自定义 POST，见下方 http_json 段
+  style: openai
+  base_url: "http://127.0.0.1:8080/v1"
+  api_key: "your-api-key"
+  model: "your-model-name"
+  timeout_sec: 120
+  temperature: 0.2
+
+  # style=http_json 时使用（按你们封装服务的字段名改）
+  http_json:
+    endpoint: "http://127.0.0.1:8080/api/chat"
+    headers: {}
+    # 请求体模板，{query} 会被替换
+    body_template:
+      query: "{query}"
+      session_id: "single-loop-local"
+    response_text_path: "answer"   # 从 JSON 响应里取文本的路径，用 . 分隔
+
+loop:
+  max_attempts: 3
+  task_type: contract-parse
+  task_name: 合同解析
+
+task:
+  expected_fields:
+    - party_a
+    - party_b
+    - amount
+    - sign_date
+  output_schema: "JSON 对象，字段：party_a, party_b, amount, sign_date"
+
+logging:
+  run_logs: "../data/run_logs.jsonl"
+  failure_cases: "../data/failure_cases.jsonl"
